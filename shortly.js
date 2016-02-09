@@ -2,6 +2,7 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var bcrypt = require('bcrypt-nodejs');
 
 
 var db = require('./app/config');
@@ -76,13 +77,31 @@ function(req, res) {
 // Write your authentication routes here
 /************************************************************/
 app.post('/login', function(req, res) {
-  var userData = req.body;
-  // new User(userData).fetch().then(function(found) {
-    // if (found) {
-
-    // }
-  // }
-  res.send(200, '');
+  var formData = req.body;
+  // User.login(req.body.username, req.body.password, function(err, result) {
+  //   if (err) {
+  //     res.redirect('/login');
+  //   } else {
+  //     res.render('index');
+  //   }
+  new User({username: formData.username}).fetch().then(function(found) {
+    if (found) {
+      console.log('found user:', JSON.stringify(found.attributes));
+      var existingPassword = found.attributes.password;
+      var salt = found.attributes.salt;
+      var hash = bcrypt.hashSync(formData.password, salt);
+      console.log('hash: ', hash);
+      console.log('existingPassword: ', existingPassword);
+      if (existingPassword === hash) {
+        res.render('index');
+      } else {
+        res.redirect('/login');
+      }
+    } else { 
+      console.log('user not found');
+    } 
+  });
+  // });
 });
 
 app.get('/login', function(req, res) {
@@ -92,7 +111,7 @@ app.get('/login', function(req, res) {
 app.post('/signup', function(req, res) {
   var userData = req.body;
   Users.create(userData)
-  .then(function(result) {res.send(200, result);});
+  .then(function(result) {res.render('index');});
 });
 
 app.get('/signup', function(req, res) {

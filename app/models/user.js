@@ -7,7 +7,7 @@ var Promise = require('bluebird');
 var User = db.Model.extend({
   tableName: 'users',
   hasTimestamps: true,
-  
+
   links: function() {
     return this.hasMany(Link);
   },
@@ -17,7 +17,6 @@ var User = db.Model.extend({
       var hash = bcrypt.hashSync(model.get('password'), salt);
       model.set('password', hash);
       model.set('salt', salt);
-
     });
   }
 });

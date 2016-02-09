@@ -51,6 +51,7 @@ app.post('/login', function(req, res) {
       }
     } else { 
       console.log('user not found');
+      res.redirect('/login');
     }
   });
 });
@@ -68,7 +69,10 @@ app.get('/login', function(req, res) {
 app.post('/signup', function(req, res) {
   var userData = req.body;
   Users.create(userData)
-  .then(function(result) {res.render('index');});
+  .then(function(result) {
+    req.session.username = userData.username;
+    res.redirect('/');
+  });
 });
 
 app.get('/signup', function(req, res) {
@@ -81,6 +85,12 @@ app.get('/signup', function(req, res) {
   });
 });
 
+app.get('/logout', function(req, res) {
+  req.session.username = '';
+  res.redirect('login');
+});
+
+
 var isLoggedIn = function (req, res, callback) {
   if (req.session && req.session.username) {
     new User({username: req.session.username}).fetch().then(function(found) {
@@ -91,7 +101,7 @@ var isLoggedIn = function (req, res, callback) {
   }
 };
 
-app.use(function(req, res, next) {
+function checkUser (req, res, next) {
   isLoggedIn (req, res, function(isLogged) {
     if (isLogged) {
       next();
@@ -99,26 +109,26 @@ app.use(function(req, res, next) {
       res.redirect('/login');
     }
   });
-});
+}
 
-app.get('/', 
+app.get('/', checkUser, 
 function(req, res) {
   res.render('index');
 });
 
-app.get('/create', 
+app.get('/create',  checkUser,
 function(req, res) {
   res.render('index');
 });
 
-app.get('/links', 
+app.get('/links',  checkUser,
 function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
 
-app.post('/links', 
+app.post('/links',  checkUser,
 function(req, res) {
   var uri = req.body.url;
 

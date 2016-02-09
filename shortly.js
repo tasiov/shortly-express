@@ -3,6 +3,8 @@ var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var bcrypt = require('bcrypt-nodejs');
+var session = require('client-sessions');
+
 
 
 var db = require('./app/config');
@@ -22,7 +24,82 @@ app.use(bodyParser.json());
 // Parse forms (signup/login)
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
+app.use(session({
+  cookieName: 'session',
+  secret: bcrypt.genSaltSync(10),
+  duration: 30 * 60 * 1000,
+  activeDuration: 5 * 60 * 1000,
+}));
 
+app.post('/login', function(req, res) {
+  var formData = req.body;
+
+  console.log('formdata: ' + JSON.stringify(formData));
+  new User({username: formData.username}).fetch().then(function(found) {
+    if (found) {
+      console.log('found user:', JSON.stringify(found.attributes));
+      var existingPassword = found.attributes.password;
+      var salt = found.attributes.salt;
+      var hash = bcrypt.hashSync(formData.password, salt);
+
+      if (existingPassword === hash) {
+        req.session.username = formData.username;
+        console.log('session username = ' + req.session.username);
+        res.redirect('/');
+      } else {
+        res.redirect('/login');
+      }
+    } else { 
+      console.log('user not found');
+    }
+  });
+});
+
+app.get('/login', function(req, res) {
+  isLoggedIn(req, res, function (isLogged) {
+    if (isLogged) {
+      res.redirect('/');
+    } else {
+      res.render('login');
+    }
+  });
+});
+
+app.post('/signup', function(req, res) {
+  var userData = req.body;
+  Users.create(userData)
+  .then(function(result) {res.render('index');});
+});
+
+app.get('/signup', function(req, res) {
+  isLoggedIn(req, res, function (isLogged) {
+    if (isLogged) {
+      res.redirect('/');
+    } else {
+      res.render('signup');
+    }
+  });
+});
+
+var isLoggedIn = function (req, res, callback) {
+  if (req.session && req.session.username) {
+    new User({username: req.session.username}).fetch().then(function(found) {
+      callback(found);
+    });
+  } else {
+    callback(null);
+  }
+};
+
+app.use(function(req, res, next) {
+  isLoggedIn (req, res, function(isLogged) {
+    if (isLogged) {
+      next();
+    } else {
+      res.redirect('/login');
+    }
+  });
+});
 
 app.get('/', 
 function(req, res) {
@@ -76,47 +153,7 @@ function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
-app.post('/login', function(req, res) {
-  var formData = req.body;
-  // User.login(req.body.username, req.body.password, function(err, result) {
-  //   if (err) {
-  //     res.redirect('/login');
-  //   } else {
-  //     res.render('index');
-  //   }
-  new User({username: formData.username}).fetch().then(function(found) {
-    if (found) {
-      console.log('found user:', JSON.stringify(found.attributes));
-      var existingPassword = found.attributes.password;
-      var salt = found.attributes.salt;
-      var hash = bcrypt.hashSync(formData.password, salt);
-      console.log('hash: ', hash);
-      console.log('existingPassword: ', existingPassword);
-      if (existingPassword === hash) {
-        res.render('index');
-      } else {
-        res.redirect('/login');
-      }
-    } else { 
-      console.log('user not found');
-    } 
-  });
-  // });
-});
 
-app.get('/login', function(req, res) {
-  res.render('login');
-});
-
-app.post('/signup', function(req, res) {
-  var userData = req.body;
-  Users.create(userData)
-  .then(function(result) {res.render('index');});
-});
-
-app.get('/signup', function(req, res) {
-  res.render('signup');
-});
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
